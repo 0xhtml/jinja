@@ -131,7 +131,7 @@ class TestHelpers:
         assert not func("FOO.TXT")
 
 
-class TestEscapeUrlizeTarget:
+class TestUrlize:
     def test_escape_urlize_target(self):
         url = "http://example.org"
         target = "<script>"
@@ -140,6 +140,26 @@ class TestEscapeUrlizeTarget:
             ' target="&lt;script&gt;">'
             "http://example.org</a>"
         )
+
+    def test_urlize_stripping(self):
+        assert (
+            urlize("http://example.org/trail.")
+            == '<a href="http://example.org/trail.">http://example.org/trail.</a>'
+        )
+        assert (
+            urlize(
+                "http://example.org/trail.",
+                strip_leading=tuple(),
+                strip_trailing=(".",),
+            )
+            == '<a href="http://example.org/trail">http://example.org/trail</a>.'
+        )
+
+    def test_urlize_arguments(self):
+        with pytest.raises(ValueError):
+            urlize("", strip_leading=tuple())
+        with pytest.raises(ValueError):
+            urlize("", strip_trailing=tuple())
 
 
 class TestLoremIpsum:

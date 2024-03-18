@@ -41,6 +41,8 @@ DEFAULT_POLICIES: t.Dict[str, t.Any] = {
     "urlize.rel": "noopener",
     "urlize.target": None,
     "urlize.extra_schemes": None,
+    "urlize.strip_leading": ("(", "<", "&lt;"),
+    "urlize.strip_trailing": (")", ">", "&gt;", ".", ",", "\n"),
     "truncate.leeway": 5,
     "json.dumps_function": None,
     "json.dumps_kwargs": {"sort_keys": True},

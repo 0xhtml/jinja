@@ -224,6 +224,8 @@ def urlize(
     rel: t.Optional[str] = None,
     target: t.Optional[str] = None,
     extra_schemes: t.Optional[t.Iterable[str]] = None,
+    strip_leading: t.Optional[t.Sequence[str]] = None,
+    strip_trailing: t.Optional[t.Sequence[str]] = None,
 ) -> str:
     """Convert URLs in text into clickable links.
 
@@ -232,10 +234,10 @@ def urlize(
     choice.
 
     Works on ``http://``, ``https://``, ``www.``, ``mailto:``, and email
-    addresses. Links with trailing punctuation (periods, commas, closing
-    parentheses) and leading punctuation (opening parentheses) are
-    recognized excluding the punctuation. Email addresses that include
-    header fields are not recognized (for example,
+    addresses. Links with trailing punctuation (by default periods, commas,
+    closing parentheses) and leading punctuation (by default opening
+    parentheses) are recognized excluding the punctuation. Email addresses
+    that include header fields are not recognized (for example,
     ``mailto:address@example.com?cc=copy@example.com``).
 
     :param text: Original text containing URLs to link.
@@ -244,6 +246,11 @@ def urlize(
     :param rel: Add the ``rel`` attribute to links.
     :param extra_schemes: Recognize URLs that start with these schemes
         in addition to the default behavior.
+    :param strip_leading: Leading characters to ignore when parsing URLs. When
+        setting ``strip_leading``, also setting ``strip_trailing`` is required.
+    :param strip_trailing: Trailing characters to ignore when parsing URLs.
+        When setting ``strip_trailing``, also setting ``strip_leading`` is
+        required.
 
     .. versionchanged:: 3.0
         The ``extra_schemes`` parameter was added.
@@ -269,43 +276,42 @@ def urlize(
         def trim_url(x: str) -> str:
             return x
 
+    if (strip_leading is None) != (strip_trailing is None):
+        raise ValueError("strip_leading and strip_trailing must be set together")
+
     words = re.split(r"(\s+)", str(markupsafe.escape(text)))
     rel_attr = f' rel="{markupsafe.escape(rel)}"' if rel else ""
     target_attr = f' target="{markupsafe.escape(target)}"' if target else ""
 
     for i, word in enumerate(words):
         head, middle, tail = "", word, ""
-        match = re.match(r"^([(<]|&lt;)+", middle)
 
-        if match:
-            head = match.group()
-            middle = middle[match.end() :]
+        if strip_leading is not None and strip_trailing is not None:
+            while middle.startswith(strip_leading):
+                for start in strip_leading:
+                    if middle.startswith(start):
+                        head, middle = head + start, middle[len(start) :]
 
-        # Unlike lead, which is anchored to the start of the string,
-        # need to check that the string ends with any of the characters
-        # before trying to match all of them, to avoid backtracking.
-        if middle.endswith((")", ">", ".", ",", "\n", "&gt;")):
-            match = re.search(r"([)>.,\n]|&gt;)+$", middle)
+            while middle.endswith(strip_trailing):
+                for end in strip_trailing:
+                    if middle.endswith(end):
+                        middle, tail = middle[: -len(end)], end + tail
 
-            if match:
-                tail = match.group()
-                middle = middle[: match.start()]
+            # Prefer balancing parentheses in URLs instead of ignoring a
+            # trailing character.
+            for start_char, end_char in zip(strip_leading, strip_trailing):
+                start_count = middle.count(start_char)
 
-        # Prefer balancing parentheses in URLs instead of ignoring a
-        # trailing character.
-        for start_char, end_char in ("(", ")"), ("<", ">"), ("&lt;", "&gt;"):
-            start_count = middle.count(start_char)
+                if start_count <= middle.count(end_char):
+                    # Balanced, or lighter on the left
+                    continue
 
-            if start_count <= middle.count(end_char):
-                # Balanced, or lighter on the left
-                continue
-
-            # Move as many as possible from the tail to balance
-            for _ in range(min(start_count, tail.count(end_char))):
-                end_index = tail.index(end_char) + len(end_char)
-                # Move anything in the tail before the end char too
-                middle += tail[:end_index]
-                tail = tail[end_index:]
+                # Move as many as possible from the tail to balance
+                for _ in range(min(start_count, tail.count(end_char))):
+                    end_index = tail.index(end_char) + len(end_char)
+                    # Move anything in the tail before the end char too
+                    middle += tail[:end_index]
+                    tail = tail[end_index:]
 
         if _http_re.match(middle):
             if middle.startswith("https://") or middle.startswith("http://"):

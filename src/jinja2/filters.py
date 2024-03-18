@@ -724,6 +724,8 @@ def do_urlize(
     target: t.Optional[str] = None,
     rel: t.Optional[str] = None,
     extra_schemes: t.Optional[t.Iterable[str]] = None,
+    strip_leading: t.Optional[t.Sequence[str]] = None,
+    strip_trailing: t.Optional[t.Sequence[str]] = None,
 ) -> str:
     """Convert URLs in text into clickable links.
 
@@ -732,10 +734,10 @@ def do_urlize(
     choice.
 
     Works on ``http://``, ``https://``, ``www.``, ``mailto:``, and email
-    addresses. Links with trailing punctuation (periods, commas, closing
-    parentheses) and leading punctuation (opening parentheses) are
-    recognized excluding the punctuation. Email addresses that include
-    header fields are not recognized (for example,
+    addresses. Links with trailing punctuation (by default periods, commas,
+    closing parentheses) and leading punctuation (by default opening
+    parentheses) are recognized excluding the punctuation. Email addresses
+    that include header fields are not recognized (for example,
     ``mailto:address@example.com?cc=copy@example.com``).
 
     :param value: Original text containing URLs to link.
@@ -747,6 +749,10 @@ def do_urlize(
         in addition to the default behavior. Defaults to
         ``env.policies["urlize.extra_schemes"]``, which defaults to no
         extra schemes.
+    :param strip_leading: Leading characters to ignore when parsing URLs.
+        Defaults to ``env.policies["urlize.strip_leading"]``.
+    :param strip_trailing: Trailing characters to ignore when parsing URLs.
+        Defaults to ``env.policies["urlize.strip_trailing"]``.
 
     .. versionchanged:: 3.0
         The ``extra_schemes`` parameter was added.
@@ -781,12 +787,20 @@ def do_urlize(
         if _uri_scheme_re.fullmatch(scheme) is None:
             raise FilterArgumentError(f"{scheme!r} is not a valid URI scheme prefix.")
 
+    if strip_leading is None:
+        strip_leading = policies["urlize.strip_leading"]
+
+    if strip_trailing is None:
+        strip_trailing = policies["urlize.strip_trailing"]
+
     rv = urlize(
         value,
         trim_url_limit=trim_url_limit,
         rel=rel,
         target=target,
         extra_schemes=extra_schemes,
+        strip_leading=strip_leading,
+        strip_trailing=strip_trailing,
     )
 
     if eval_ctx.autoescape:
